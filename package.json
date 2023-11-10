@@ -1,5 +1,5 @@
 {
-  "name": "@fordi/node-html-reporter",
+  "name": "@fordi-org/node-html-reporter",
   "version": "0.0.1",
   "description": "HTML Reporter for node:test",
   "main": "src/index.js",
