@@ -69,7 +69,7 @@ export default ({ filename, report, content }) => html`
     </div>
   </div>
   <table class="hljs">
-    ${hljs.highlightAuto(content).value.split('\n').map((line, index) => {
+    ${hljs.highlightAuto(content.toString('utf-8')).value.split('\n').map((line, index) => {
       const functions = report.functions.filter(({ line }) => line === index + 1);
       const branches = report.functions.filter(({ line }) => line === index + 1);
       return decorateLine(line, report.lines[index], functions, branches);
