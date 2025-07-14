@@ -197,3 +197,20 @@ a, a:visited, a:hover, a:active {
   font-weight: bold;
   margin-right: 0.25em;
 }
+
+table.listing {
+  width: 100%;
+}
+table.listing th {
+  text-align: left;
+}
+
+table.listing tr.row-ok {
+  background-color: rgba(0, 255, 0, 0.25);
+}
+table.listing tr.row-warn {
+  background-color: rgba(255, 255, 0, 0.125);
+}
+table.listing tr.row-bad {
+  background-color: rgba(255, 0, 0, 0.25);
+}

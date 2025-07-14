@@ -1,21 +1,15 @@
+const root = `#${[...document.querySelectorAll('script[type="template"][id]')].map(({ id }) => id).sort()[0]}`;
+
 const goTo = (href) => {
-  const template = document.querySelector(href.replace(/([\/\.])/g, '\\$1'));
+  const template = document.querySelector((href || root).replace(/([\/\.])/g, '\\$1'));
   if (!template) {
     return;
   }
   document.body.innerHTML = template.innerHTML;
 };
 
-document.body.addEventListener('click', (event) => {
-  const href = event.target.getAttribute('href');
-  if (!href?.startsWith?.('#')) {
-    return;
-  }
-  try {
-    goTo(href);
-    return true;
-  } catch (e) {
-  }
+window.addEventListener('hashchange', (event) => {
+  goTo(new URL(event.newURL).hash);
 });
 
-goTo(location.hash || '#/');
+goTo(location.hash);

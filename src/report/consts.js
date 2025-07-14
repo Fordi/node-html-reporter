@@ -1,0 +1,1 @@
+export const TYPES = ['Line', 'Branch', 'Function'];

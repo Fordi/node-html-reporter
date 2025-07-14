@@ -1,6 +1,6 @@
 {
   "name": "@fordi-org/node-html-reporter",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "HTML Reporter for node:test",
   "main": "src/index.js",
   "type": "module",
@@ -8,7 +8,7 @@
   "author": "Bryan Elliott",
   "license": "ISC",
   "dependencies": {
-    "highlight.js": "^11.9.0",
+    "highlight.js": "^11.11.1",
     "htm": "^3.1.1",
     "vhtml": "^2.2.0"
   }

@@ -1,141 +1,125 @@
 import { Transform } from "node:stream";
 import { readFile, writeFile } from "node:fs/promises";
-import { relative } from "node:path";
-import hljs from "highlight.js";
-import html from './html.js';
-import Template from './report/Template.js';
-import SourceFile from './report/SourceFile.js';
+import { basename, relative } from "node:path";
+import CoverageReport from "./report/CoverageReport.js";
+import { TYPES } from "./report/consts.js";
 
-const { max } = Math;
+const sumMetrics = (entries) => {
+  const metrics = {};
+  for (const entry of entries) {
+    if (entry.type === 'dir') {
+      Object.assign(entry, sumMetrics(entry.content));
+    }
+    for (const type of TYPES) {
+      metrics[`total${type}Count`] ??= 0;
+      metrics[`covered${type}Count`] ??= 0;
+      metrics[`total${type}Count`] = entry[`total${type}Count`];
+      metrics[`covered${type}Count`] = entry[`covered${type}Count`];   
+    }
+  }
+  for (const type of TYPES) {
+    metrics[`covered${type}Percent`] = 100 * metrics[`covered${type}Count`] / metrics[`total${type}Count`];
+  }
+  return metrics;
+};
 
-class TestReporter extends Transform {
-  constructor(config) {
-    super({
-      ...config,
-      transform: async ({ type, data, ...rest }, encoding, callback) => {
-        const name = type.replace(/:/g, '_');
+const reduceTree = (dir) => {
+  if (dir.type !== 'dir') return dir;
+  if (dir.content.length === 1) {
+    const child = { ...dir.content[0] };
+    child.name = `${dir.name}/${child.name}`.replace(/^\/+/, '');
+    return reduceTree(child);
+  }
+  if (dir.type === 'dir' && dir.content.length) {
+    return {
+      ...dir,
+      content: dir.content.map(reduceTree),
+    };
+  }
+  return dir;
+};
+
+const walkTree = (tree, onEach) => {
+  if (tree.type === 'dir') {
+    for (const entry of tree.content) {
+      walkTree(entry, onEach);
+    }
+  }
+  onEach(tree);
+};
+
+class HtmlReporter extends Transform {
+  constructor(config = {}) {
+    const transform = async (payload, encoding, callback) => {
+      const { type, data, ...rest } = payload;
+      if (type === 'test:coverage') {
         try {
-          callback(null, await (this[name] ?? this['unhandled']).call(this, data, { encoding, ...rest, type }));
+          callback(undefined, await this.handleCoverage(data, { encoding, type, ...rest }));
         } catch (e) {
           console.warn(e);
           callback(e);
         }
-      },
-    });
-  }
-  unhandled(data, { type, ...metadata }) {
-    return [
-      `Unhandled event: ${type}`,
-      `\t${JSON.stringify({ data, metadata })}`,
-    ].join('\n') + '\n';
-  }
-}
-
-const FULLPATH = Symbol('FULLPATH');
-
-class HtmlReporter extends TestReporter {
-  #count = 0;
-  #silent = false;
-  constructor({ silent, ...config }) {
-    super(config);
-    this.#silent = true;
+      } else {
+        callback(undefined, undefined);
+      }
+    };
+    super({ ...config, writableObjectMode: true, transform });
   }
   
-  async test_coverage({ summary }, { encoding }) {
-    const { workingDirectory, files } = summary;
-    const templates = {};
-    const links = [];
-    const root = {};
-    Object.defineProperty(root, FULLPATH, { value: '/' });
-    await Promise.all(files.map(async (file) => {
+  async handleCoverage({ summary }, { encoding }) {
+    let subjects = {};
+    let tree = {
+      type: "dir",
+      name: '',
+      filename: '/',
+      content: [],
+    };
+
+    await Promise.all(summary.files.map(async (file) => {
       if (/(\/test\/.*|test[\.-_][^\/]+|[\.-_]test)\.?[cm]?js/.test(file.path)) {
         return;
       }
-      const filename = relative(workingDirectory, file.path);
-      const content = await readFile(file.path, encoding);
-      templates[filename] = html`
-        <${Template} id=${`/${filename}`}>
-          <${SourceFile} filename=${filename} report=${file} content=${content} />
-        </>
-      `;
-      let dir = root;
-      filename.split('/').forEach((part, index, arr) => {
-        if (!dir[part]) {
-          dir[part] = {};
-          Object.defineProperty(dir[part], FULLPATH, { value: `/${arr.slice(0, index + 1).join('/')}` });
-        }
-        dir = dir[part];
-      });
-    }));
-    const Listing = ({ files }) => html`
-      ${files.map((file) => html`
-        <a href=${`#${file}`}>${file}</a>
-      `)}
-    `;
-    const walkTree = (dir) => {
-      const path = dir[FULLPATH];
-      if (!templates[path]) {
-        templates[path] = html`
-          <${Template} id=${`${path}`}>
-            <${Listing} files=${Object.keys(dir).map(child => dir[child][FULLPATH])} />
-          </${Template}>
-        `;
-        Object.keys(dir).forEach(part => {
-          walkTree(dir[part]);
-        });
+      const filename = `/${relative(summary.workingDirectory, file.path)}`;
+      if (!subjects[filename]) {
+        subjects[filename] = { type: "file", filename, name: basename(filename) };
+      } 
+      if (!subjects[filename].content) {
+        subjects[filename].content = await readFile(file.path, encoding);
       }
-    };
-    walkTree(root);
-    templates['/'] = html`
-      <${Template} id="/">
-        <${Listing} files=${Object.keys(root).map(child => root[child][FULLPATH])} />
-      </>
-    `;
-    const reportHandler = await readFile(new URL('./report/reportHandler.js', import.meta.url).pathname, 'utf8');
-    const reportStyle = await readFile(new URL('./report/reportStyle.css', import.meta.url).pathname, 'utf8');
-    await writeFile(`${process.env.NODE_V8_COVERAGE}/index.html`, `<!DOCTYPE html>\n${html`
-      <html>
-        <head>
-          <meta charset="utf8" />
-          <title>Coverage</title>
-          ${Object.keys(templates).map((key) => templates[key])}
-          <script type="module" defer>${html.raw(reportHandler)}</script>
-          <style>${html.raw(reportStyle)}</style>
-        </head>
-        <body>
-        </body>
-      </html>
-    `}`, 'utf8');
+      Object.assign(subjects[filename], file);
+      let dir = tree;
+      let path = filename.replace(/^\/+/, '').split('/');
+      for (let index = 0; index < path.length; index++) {
+        const part = path[index];
+        const soFar = `/${path.slice(0, index + 1).join('/')}`;
+        const dirChild = dir.content?.find?.(({ name }) => name === part);
+        let child = subjects[soFar] ?? dirChild ?? {
+          type: "dir",
+          name: part,
+          filename: soFar,
+          content: [],
+        };
+        subjects[soFar] ??= child;
+        if (!dirChild) {
+          dir.content.push(child);
+        }
+        dir = child;
+      }
+    }));
     
-    if (this.#silent) {
-      return '';
-    }
-    return '';
+    tree = reduceTree(tree);
+    subjects = {};
+    walkTree(tree, (entry) => subjects[entry.filename] = entry);
+    Object.assign(tree, sumMetrics(tree.content));
+    await writeFile('temp.json', JSON.stringify(tree, null, 2), 'utf-8');
+
+    const reportHandler = await readFile(new URL('./report/reportHandler.js', import.meta.url).pathname, 'utf-8');
+    const reportStyle = await readFile(new URL('./report/reportStyle.css', import.meta.url).pathname, 'utf-8');
+
+    const outputFile = `${process.env.NODE_V8_COVERAGE}/index.html`;
+    await writeFile(outputFile, `<!DOCTYPE html>\n${CoverageReport({ reportHandler, reportStyle, subjects })}`, 'utf8');
+    console.info(`Coverage written to ./${relative(process.cwd(), outputFile)}`);
   }
-  test_pass() {
-    if (this.#silent) {
-      return '';
-    }
-    return this.step('.');
-  }
-  test_fail() {
-    if (this.#silent) {
-      return '';
-    }
-    return this.step('X');
-  }
-  
-  step(char) {
-    let nl = '';
-    if (max(process.stdout.columns ?? 20, 20) === ++this.#count) {
-      nl = '\n';
-      this.#count = 0;
-    }
-    return `${char}${nl}`;
-  }
-  unhandled() {}
 }
 
-export default new HtmlReporter({
-  writableObjectMode: true,
-});
+export default new HtmlReporter();
