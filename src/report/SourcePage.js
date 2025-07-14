@@ -1,5 +1,6 @@
 import html from "../html.js";
 import { TYPES } from "./consts.js";
+import EntityPath from "./EntityPath.js";
 import SourceFile from "./SourceFile.js";
 import Template from "./Template.js";
 
@@ -9,16 +10,7 @@ export default function SourcePage({ filename, content, ...report }) {
   return html`
     <${Template} id=${filename}>
       <div class="report">
-        <div class="path">
-          <a href="#/">(root)</a>/
-          ${filename.split('/').map((part, index, arr) => {
-            if (index == arr.length - 1) {
-              return part;
-            }
-            const ref = `#${arr.slice(0, index + 1).join('/')}`;
-            return html`<a href=${ref}>${part}</a>/`;
-          })}
-        </div>
+        <${EntityPath} filename=${filename} />
         <div class="coverage">
           ${TYPES.map((type) => html`
             <div class="coverage-part">
