@@ -111,7 +111,6 @@ class HtmlReporter extends Transform {
     subjects = {};
     walkTree(tree, (entry) => subjects[entry.filename] = entry);
     Object.assign(tree, sumMetrics(tree.content));
-    await writeFile('temp.json', JSON.stringify(tree, null, 2), 'utf-8');
 
     const reportHandler = await readFile(new URL('./report/reportHandler.js', import.meta.url).pathname, 'utf-8');
     const reportStyle = await readFile(new URL('./report/reportStyle.css', import.meta.url).pathname, 'utf-8');
