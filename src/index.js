@@ -118,7 +118,7 @@ class HtmlReporter extends Transform {
 
     const outputFile = `${process.env.NODE_V8_COVERAGE}/index.html`;
     await writeFile(outputFile, `<!DOCTYPE html>\n${CoverageReport({ reportHandler, reportStyle, subjects })}`, 'utf8');
-    console.info(`Coverage written to ./${relative(process.cwd(), outputFile)}`);
+    console.info(`Coverage written to ${relative(process.cwd(), outputFile)}`);
   }
 }
 
