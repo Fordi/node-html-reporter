@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { basename, relative } from "node:path";
 import CoverageReport from "./report/CoverageReport.js";
 import { TYPES } from "./report/consts.js";
+import { fileURLToPath } from "node:url";
 
 const sumMetrics = (entries) => {
   const metrics = {};
@@ -79,7 +80,7 @@ class HtmlReporter extends Transform {
       if (/(\/test\/.*|test[\.-_][^\/]+|[\.-_]test)\.?[cm]?js/.test(file.path)) {
         return;
       }
-      const filename = `/${relative(summary.workingDirectory, file.path)}`;
+      const filename = `/${relative(summary.workingDirectory, file.path)}`.replace(/\\/g, '/');
       if (!subjects[filename]) {
         subjects[filename] = { type: "file", filename, name: basename(filename) };
       } 
@@ -111,9 +112,9 @@ class HtmlReporter extends Transform {
     subjects = {};
     walkTree(tree, (entry) => subjects[entry.filename] = entry);
     Object.assign(tree, sumMetrics(tree.content));
-
-    const reportHandler = await readFile(new URL('./report/reportHandler.js', import.meta.url).pathname, 'utf-8');
-    const reportStyle = await readFile(new URL('./report/reportStyle.css', import.meta.url).pathname, 'utf-8');
+    
+    const reportHandler = await readFile(fileURLToPath(new URL('./report/reportHandler.js', import.meta.url)), 'utf-8');
+    const reportStyle = await readFile(fileURLToPath(new URL('./report/reportStyle.css', import.meta.url)), 'utf-8');
 
     const outputFile = `${process.env.NODE_V8_COVERAGE}/index.html`;
     await writeFile(outputFile, `<!DOCTYPE html>\n${CoverageReport({ reportHandler, reportStyle, subjects })}`, 'utf8');

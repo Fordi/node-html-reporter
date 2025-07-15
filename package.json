@@ -1,6 +1,6 @@
 {
   "name": "@fordi-org/node-html-reporter",
-  "version": "0.0.5",
+  "version": "0.1.0",
   "description": "HTML Reporter for node:test",
   "main": "src/index.js",
   "bin": {

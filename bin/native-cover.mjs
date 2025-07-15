@@ -1,12 +1,12 @@
-#!/bin/env node
+#!/usr/bin/env node
 import { rm, mkdir } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { relative } from "node:path";
 
 const coverageDir = process.env.NODE_V8_COVERAGE ?? './coverage';
 
-const reporter = fileURLToPath(new URL('../src/index.js', import.meta.url));
-
+const reporter = new URL('../src/index.js', import.meta.url);
 await rm(coverageDir, { recursive: true }).catch(() => {});
 await mkdir(coverageDir, { recursive: true });
 await new Promise((resolve, reject) => {
